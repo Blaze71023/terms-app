@@ -20,6 +20,7 @@ type DraftAgreement = {
 };
 
 const STORAGE_KEY = "draftAgreement";
+const PAID_KEY = "terms_isPaid"; // set to "true" to remove watermark
 
 function loadDraft(): DraftAgreement | null {
   try {
@@ -34,6 +35,7 @@ function loadDraft(): DraftAgreement | null {
 export default function ReviewPage() {
   const router = useRouter();
   const [draft, setDraft] = useState<DraftAgreement | null>(null);
+  const [isPaid, setIsPaid] = useState(false);
 
   useEffect(() => {
     const d = loadDraft();
@@ -42,7 +44,10 @@ export default function ReviewPage() {
       return;
     }
     setDraft(d);
+    setIsPaid(sessionStorage.getItem(PAID_KEY) === "true");
   }, [router]);
+
+  const hasNotary = !!(draft?.includeNotary && draft?.notary?.certificateText);
 
   const preview = useMemo(() => {
     if (!draft) return "";
@@ -50,74 +55,105 @@ export default function ReviewPage() {
     const lines: string[] = [];
     lines.push(draft.title?.trim() ? draft.title.trim() : "(Untitled)");
     lines.push("");
-    lines.push("People present:");
+    lines.push("People:");
     lines.push(`- ${draft.personA || "Person A"}`);
     lines.push(`- ${draft.personB || "Person B"}`);
     lines.push("");
+    lines.push("Agreement:");
     lines.push(draft.agreementText || "");
 
-    if (draft.includeNotary && draft.notary?.certificateText) {
+    if (hasNotary) {
       lines.push("");
-      lines.push("Notary:");
+      lines.push("Notary Certificate:");
       lines.push("Venue-based: notary completes certificate per the law where notarization occurs.");
-      if (draft.notary.mode) lines.push(`Mode: ${draft.notary.mode}`);
-      if (draft.notary.state || draft.notary.parish) {
+      if (draft.notary?.mode) lines.push(`Mode: ${draft.notary.mode}`);
+      if (draft.notary?.state || draft.notary?.parish) {
         lines.push(
-          `Venue: ${draft.notary.state || ""}${draft.notary.parish ? " — Parish of " + draft.notary.parish : ""}`
+          `Venue: ${draft.notary?.state || ""}${
+            draft.notary?.parish ? " — County/Parish of " + draft.notary.parish : ""
+          }`
         );
       }
       lines.push("");
-      lines.push(draft.notary.certificateText);
+      lines.push(draft.notary?.certificateText || "");
     }
 
     return lines.join("\n");
-  }, [draft]);
-
-  async function copyPreview() {
-    await navigator.clipboard.writeText(preview);
-  }
+  }, [draft, hasNotary]);
 
   if (!draft) return null;
 
   return (
-    <main className="min-h-screen bg-[#050816] px-4 py-8 text-white">
-      <div className="mx-auto w-full max-w-2xl space-y-6">
-        <div className="overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-r from-indigo-600 via-fuchsia-600 to-purple-600 p-7 shadow-[0_30px_90px_rgba(0,0,0,0.65)]">
-          <div className="text-white/85 text-sm font-semibold">Mutual Acknowledgment</div>
-          <div className="mt-2 text-4xl font-semibold tracking-tight text-white">Review</div>
-          <div className="mt-3 text-white/90 text-lg">Read it together. If it’s true, proceed.</div>
+    <main className="min-h-screen px-4 py-8 text-white">
+      <style jsx global>{`
+        .preview-watermark {
+          position: absolute;
+          top: 40%;
+          left: 50%;
+          transform: translate(-50%, -50%) rotate(-20deg);
+          font-size: 2.5rem;
+          font-weight: 800;
+          color: rgba(0, 0, 0, 0.08);
+          pointer-events: none;
+          user-select: none;
+          white-space: nowrap;
+          text-align: center;
+          letter-spacing: 0.02em;
+        }
+        .preview-watermark .wm-sub {
+          display: block;
+          margin-top: 0.35rem;
+          font-size: 1.05rem;
+          font-weight: 700;
+        }
+        .preview-watermark .wm-small {
+          display: block;
+          margin-top: 0.25rem;
+          font-size: 0.95rem;
+          font-weight: 600;
+        }
+      `}</style>
 
-          <div className="mt-6">
-            <div className="flex items-center justify-between text-white/70 text-sm font-semibold">
-              <span>Create</span>
-              <span className="text-white font-semibold">Review</span>
-              <span>Ack</span>
-              <span>Receipt</span>
-            </div>
-            <div className="mt-3 h-2 rounded-full bg-white/20">
-              <div className="h-2 w-[50%] rounded-full bg-white/85" />
-            </div>
-          </div>
+      <div className="mx-auto w-full max-w-2xl space-y-6">
+        {/* Match Receipt hero */}
+        <div className="ui-hero p-6">
+          <div className="text-white/90 text-sm font-semibold">Mutual Acknowledgment</div>
+          <div className="mt-2 text-3xl font-semibold text-white">Review</div>
+          <div className="mt-2 text-white/90">Read it together. If it’s true, proceed.</div>
         </div>
 
-        <section className="ui-surface p-6">
-          <div className="ui-paper p-6">
-            <div className="text-sm text-slate-500">Preview</div>
-            <div className="mt-3 whitespace-pre-wrap text-slate-800 leading-6">{preview}</div>
-          </div>
+        {/* Document */}
+        <section className="ui-paper p-6 relative overflow-hidden">
+          {!isPaid && (
+            <div className="preview-watermark">
+              DRAFT – UNFINALIZED AGREEMENT
+              <span className="wm-sub">Generated via Terms App (Preview Mode)</span>
+              <span className="wm-small">Finalization requires unlock.</span>
+            </div>
+          )}
 
-          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <button className="ui-btn-ghost" onClick={() => router.push("/new")}>
-              Back
-            </button>
-            <button className="ui-btn-ghost" onClick={copyPreview}>
-              Copy
-            </button>
-            <button className="ui-btn-primary" onClick={() => router.push("/ack")}>
-              Proceed to Acknowledge
-            </button>
+          <div className="receipt-block">
+            <div className="print-logo">TERMS APP</div>
+            <div className="print-title">Preview</div>
+
+            <div className="print-section-title">Agreement</div>
+            <div className="print-body print-pre">{preview}</div>
+
+            <div className="print-footer">
+              Not legal advice. This is a plain-language record of what both people agreed to.
+            </div>
           </div>
         </section>
+
+        {/* Controls (no Copy) */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <button className="ui-btn-ghost" onClick={() => router.push("/new")}>
+            Back
+          </button>
+          <button className="ui-btn-primary" onClick={() => router.push("/ack")}>
+            Proceed to Acknowledge
+          </button>
+        </div>
 
         <footer className="text-white/55 text-sm leading-6">
           Not legal advice. This is a clean record of what both people agreed to.

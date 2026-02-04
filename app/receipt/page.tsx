@@ -26,6 +26,9 @@ type DraftAgreement = {
 
 const STORAGE_KEY = "draftAgreement";
 
+// Minimal “paid” flag (no backend). Later you can flip this when payment succeeds.
+const PAID_KEY = "terms_isPaid"; // set to "true" to remove watermark
+
 function loadDraft(): DraftAgreement | null {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
@@ -40,10 +43,12 @@ export default function ReceiptPage() {
   const router = useRouter();
   const [draft, setDraft] = useState<DraftAgreement | null>(null);
   const [checkedStorage, setCheckedStorage] = useState(false);
+  const [isPaid, setIsPaid] = useState(false);
 
   useEffect(() => {
     const d = loadDraft();
     setDraft(d);
+    setIsPaid(sessionStorage.getItem(PAID_KEY) === "true");
     setCheckedStorage(true);
   }, []);
 
@@ -58,60 +63,9 @@ export default function ReceiptPage() {
 
   const hasNotary = !!(draft?.includeNotary && draft?.notary?.certificateText);
 
-  // ✅ Copy text = plain / complete / no layout quirks
-  const receiptTextForCopy = useMemo(() => {
-    if (!draft) return "";
-
-    const lines: string[] = [];
-    lines.push("Record of Mutual Acknowledgment");
-    lines.push(`Created: ${createdAtLabel}`);
-    if (draft.title) lines.push(`Title: ${draft.title}`);
-    lines.push("");
-    lines.push("People:");
-    lines.push(`- ${draft.personA || "Person A"}`);
-    lines.push(`- ${draft.personB || "Person B"}`);
-    lines.push("");
-    lines.push("Agreement:");
-    lines.push(draft.agreementText || "");
-    lines.push("");
-    lines.push("This record reflects our mutual understanding at the time of agreement.");
-
-    if (hasNotary) {
-      lines.push("");
-      lines.push("Notary Certificate:");
-      lines.push(
-        "This certificate may be completed, modified, or replaced by the notary as required by applicable state law."
-      );
-      lines.push(`Parties to be notarized: ${draft.personA || "Person A"} and ${draft.personB || "Person B"}.`);
-      lines.push(
-        "Venue-based: the notary completes the certificate per the law where notarization occurs."
-      );
-      if (draft.notary?.mode) lines.push(`Mode: ${draft.notary.mode}`);
-      if (draft.notary?.state || draft.notary?.parish) {
-        lines.push(
-          `Venue: ${draft.notary?.state || ""}${
-            draft.notary?.parish ? " — County/Parish of " + draft.notary.parish : ""
-          }`
-        );
-      }
-      lines.push("");
-      lines.push(draft.notary?.certificateText || "");
-    }
-
-    lines.push("");
-    lines.push("Not legal advice.");
-
-    return lines.join("\n");
-  }, [draft, createdAtLabel, hasNotary]);
-
   function newAgreement() {
     sessionStorage.removeItem(STORAGE_KEY);
     router.push("/new");
-  }
-
-  async function copyText() {
-    if (!draft) return;
-    await navigator.clipboard.writeText(receiptTextForCopy);
   }
 
   if (checkedStorage && !draft) {
@@ -143,16 +97,53 @@ export default function ReceiptPage() {
 
   return (
     <main className="min-h-screen px-4 py-8 text-white">
+      <style jsx global>{`
+        .preview-watermark {
+          position: absolute;
+          top: 40%;
+          left: 50%;
+          transform: translate(-50%, -50%) rotate(-20deg);
+          font-size: 2.5rem;
+          font-weight: 800;
+          color: rgba(0, 0, 0, 0.08);
+          pointer-events: none;
+          user-select: none;
+          white-space: nowrap;
+          text-align: center;
+          letter-spacing: 0.02em;
+        }
+        .preview-watermark .wm-sub {
+          display: block;
+          margin-top: 0.35rem;
+          font-size: 1.05rem;
+          font-weight: 700;
+        }
+        .preview-watermark .wm-small {
+          display: block;
+          margin-top: 0.25rem;
+          font-size: 0.95rem;
+          font-weight: 600;
+        }
+      `}</style>
+
       <div className="mx-auto w-full max-w-2xl space-y-6">
-        {/* ✅ Screen hero (bright gradient like /ack) */}
+        {/* Hero */}
         <div className="ui-hero p-6 no-print">
           <div className="text-white/90 text-sm font-semibold">Mutual Acknowledgment</div>
           <div className="mt-2 text-3xl font-semibold text-white">Receipt</div>
-          <div className="mt-2 text-white/90">Print it or copy it.</div>
+          <div className="mt-2 text-white/90">Preview free, then unlock the final.</div>
         </div>
 
         {/* Document (screen + print) */}
-        <section className="ui-paper p-6 print-paper">
+        <section className="ui-paper p-6 print-paper relative overflow-hidden">
+          {!isPaid && (
+            <div className="preview-watermark">
+              DRAFT – UNFINALIZED AGREEMENT
+              <span className="wm-sub">Generated via Terms App (Preview Mode)</span>
+              <span className="wm-small">Finalization requires unlock.</span>
+            </div>
+          )}
+
           {/* ========= PAGE 1: AGREEMENT ========= */}
           <div className="receipt-block">
             <div className="print-logo">TERMS APP</div>
@@ -165,10 +156,8 @@ export default function ReceiptPage() {
               <strong>{draft.personB || "Person B"}</strong> (“Buyer”) agrees to purchase, the following:
             </div>
 
-            {/* Agreement text itself */}
             <div className="print-body print-pre">{draft.agreementText || ""}</div>
 
-            {/* One (1) acknowledgment sentence only */}
             <div className="print-section-title">Acknowledgment</div>
             <div className="print-body">
               This record reflects our mutual understanding at the time of agreement.
@@ -177,7 +166,6 @@ export default function ReceiptPage() {
               </div>
             </div>
 
-            {/* Signatures */}
             <div className="print-section-title">Signatures</div>
             <div className="print-body">
               <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.6fr", gap: "16px" }}>
@@ -200,7 +188,6 @@ export default function ReceiptPage() {
               </div>
             </div>
 
-            {/* Keep disclaimer on agreement page only */}
             <div className="print-footer">
               Not legal advice. This is a plain-language record of what both people agreed to.
             </div>
@@ -223,22 +210,26 @@ export default function ReceiptPage() {
                 {draft.notary?.parish ? ` — County/Parish of ${draft.notary.parish}` : ""}
               </div>
 
-              <div className="print-notary-box print-mono print-pre">
-                {draft.notary?.certificateText || ""}
-              </div>
+              <div className="print-notary-box print-mono print-pre">{draft.notary?.certificateText || ""}</div>
             </div>
           ) : null}
         </section>
 
         {/* Controls */}
         <div className="space-y-3 no-print">
-          <button className="ui-btn-ghost" onClick={() => window.print()}>
-            Print
+          <button className="ui-btn-ghost" onClick={() => router.push("/review")}>
+            Preview (Free)
           </button>
-          <button className="ui-btn-ghost" onClick={copyText}>
-            Copy Text
+
+          <button className="ui-btn-primary" onClick={() => alert("Unlock Final – $1.99 (coming next)")}>
+            Unlock Final – $1.99
           </button>
-          <button className="ui-btn-primary" onClick={newAgreement}>
+
+          <button className="ui-btn-ghost" onClick={() => alert("Go Pro – $9.99 / month (coming next)")}>
+            Go Pro – $9.99 / month
+          </button>
+
+          <button className="ui-btn-ghost" onClick={newAgreement}>
             New Agreement
           </button>
         </div>
