@@ -11,6 +11,9 @@ type DraftAgreement = {
   agreementText: string;
   includeNotary?: boolean;
 };
+<div className="fixed bottom-4 right-4 z-50 rounded-xl bg-black px-3 py-2 text-xs font-semibold text-white shadow-lg">
+  PREVIEW BUILD – SAFE
+</div>
 
 const STORAGE_KEY = "draftAgreement";
 
