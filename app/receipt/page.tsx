@@ -168,8 +168,8 @@ export default function ReceiptPage() {
 
   if (!isReady) {
     return (
-      <main className="min-h-screen bg-neutral-100 px-4 py-8 text-neutral-900">
-        <div className="mx-auto max-w-3xl rounded-3xl border border-neutral-200 bg-white p-8 shadow-sm">
+      <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.96),rgba(245,245,245,1)_46%,rgba(240,240,240,1)_100%)] px-4 py-8 text-neutral-900">
+        <div className="mx-auto max-w-3xl rounded-3xl border border-neutral-200 bg-white p-8 shadow-[0_10px_30px_rgba(0,0,0,0.08)]">
           <p className="text-sm text-neutral-500">Loading receipt...</p>
         </div>
       </main>
@@ -178,8 +178,8 @@ export default function ReceiptPage() {
 
   if (!agreement) {
     return (
-      <main className="min-h-screen bg-neutral-100 px-4 py-8 text-neutral-900">
-        <div className="mx-auto max-w-3xl rounded-3xl border border-neutral-200 bg-white p-8 shadow-sm">
+      <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.96),rgba(245,245,245,1)_46%,rgba(240,240,240,1)_100%)] px-4 py-8 text-neutral-900">
+        <div className="mx-auto max-w-3xl rounded-3xl border border-neutral-200 bg-white p-8 shadow-[0_10px_30px_rgba(0,0,0,0.08)]">
           <div className="space-y-4 text-center">
             <h1 className="text-2xl font-semibold">No agreement found</h1>
             <p className="text-sm text-neutral-600">
@@ -188,7 +188,7 @@ export default function ReceiptPage() {
             <div className="pt-2">
               <Link
                 href="/new"
-                className="inline-flex items-center justify-center rounded-2xl bg-neutral-900 px-5 py-3 text-sm font-medium text-white transition hover:opacity-90"
+                className="inline-flex items-center justify-center rounded-2xl bg-neutral-900 px-5 py-3 text-sm font-medium text-white shadow-sm transition hover:opacity-90"
               >
                 Start a new agreement
               </Link>
@@ -203,7 +203,7 @@ export default function ReceiptPage() {
   }
 
   return (
-    <main className="min-h-screen bg-neutral-100 px-4 py-8 text-neutral-900 print:bg-white print:px-0 print:py-0">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.96),rgba(245,245,245,1)_46%,rgba(240,240,240,1)_100%)] px-4 py-8 text-neutral-900 print:bg-white print:px-0 print:py-0">
       <div className="mx-auto max-w-4xl">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
           <Link
@@ -235,21 +235,21 @@ export default function ReceiptPage() {
         </div>
 
         {usedFreeThisTime && (
-          <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 print:hidden">
+          <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow-sm print:hidden">
             Your first finalized agreement is free.
           </div>
         )}
 
         {!isClean && (
-          <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 print:hidden">
+          <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm print:hidden">
             Lock this agreement as a clean, shareable record. Finalize – $1.99
           </div>
         )}
 
-        <section className="relative overflow-hidden rounded-[28px] border border-neutral-200 bg-white shadow-sm print:rounded-none print:border-0 print:shadow-none">
+        <section className="relative overflow-hidden rounded-[28px] border border-neutral-200 bg-white shadow-[0_10px_30px_rgba(0,0,0,0.08)] print:rounded-none print:border-0 print:shadow-none">
           {!isClean && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden">
-              <div className="select-none text-center text-[2rem] font-extrabold uppercase tracking-[0.22em] text-neutral-300/70 sm:text-[3rem]">
+              <div className="select-none text-center text-[2rem] font-extrabold uppercase tracking-[0.22em] text-neutral-300/60 sm:text-[3rem]">
                 <div className="-rotate-24 whitespace-pre-line">
                   DRAFT – UNFINALIZED AGREEMENT
                   {"\n"}
@@ -266,7 +266,7 @@ export default function ReceiptPage() {
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">
                     Terms
                   </p>
-                  <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+                  <h1 className="mt-2 text-3xl font-semibold tracking-tight text-neutral-950">
                     {agreementTitle}
                   </h1>
                   <p className="mt-2 text-sm text-neutral-600">
@@ -274,12 +274,16 @@ export default function ReceiptPage() {
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm">
+                <div
+                  className={`rounded-2xl px-4 py-3 text-sm font-semibold ${
+                    isClean
+                      ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border border-amber-200 bg-amber-50 text-amber-700"
+                  }`}
+                >
                   <div className="flex items-center gap-2">
-                    <span className="text-neutral-500">Status:</span>
-                    <span className="font-semibold text-neutral-900">
-                      {isClean ? "Finalized" : "Draft / Unfinalized"}
-                    </span>
+                    <span className="opacity-80">Status:</span>
+                    <span>{isClean ? "Finalized" : "Draft / Unfinalized"}</span>
                   </div>
                 </div>
               </div>
@@ -306,7 +310,7 @@ export default function ReceiptPage() {
             </div>
 
             <section className="py-6">
-              <h2 className="text-lg font-semibold">Agreement details</h2>
+              <h2 className="text-lg font-semibold text-neutral-950">Agreement details</h2>
 
               <div className="mt-4 overflow-hidden rounded-3xl border border-neutral-200">
                 {displayFields.length > 0 ? (
@@ -334,7 +338,7 @@ export default function ReceiptPage() {
             </section>
 
             <section className="border-t border-neutral-200 py-6">
-              <h2 className="text-lg font-semibold">Acknowledgment</h2>
+              <h2 className="text-lg font-semibold text-neutral-950">Acknowledgment</h2>
               <p className="mt-3 text-sm leading-6 text-neutral-700">
                 This record reflects the information entered and acknowledged by
                 the parties at the time shown above. TERMS provides a plain-language
