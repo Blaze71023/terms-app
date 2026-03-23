@@ -1,469 +1,355 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 
-const APP_META = {
-  product: "TERMS",
-  company: "ZeroHour Systems",
-  internalCredits: ["SubZero", "Phantom Nemesis"],
-  supportEmail: "support@zerohour.systems",
+type AgreementRecord = {
+  title?: string;
+  agreementType?: string;
+  createdAt?: string;
+  acknowledgedAt?: string;
+  isPaid?: boolean;
+  fields?: Record<string, string>;
+  [key: string]: unknown;
 };
 
-type DraftAgreement = {
-  title: string;
-  personA: string;
-  personB: string;
-  agreementText: string;
-  includeNotary?: boolean;
-  notary?: {
-    mode?: string;
-    state?: string;
-    parish?: string;
-    certificateText?: string;
-  };
-  acknowledgments?: {
-    personA?: { typedName: string; timestamp: number };
-    personB?: { typedName: string; timestamp: number };
-  };
-};
+const STORAGE_KEYS = ["receiptAgreement", "finalAgreement", "draftAgreement"];
+const FREE_FLAG_KEY = "terms_free_used";
 
-const STORAGE_KEY = "draftAgreement";
-const PAID_KEY = "terms_isPaid";
+function readAgreementFromSession(): AgreementRecord | null {
+  if (typeof window === "undefined") return null;
 
-function loadDraft(): DraftAgreement | null {
-  try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as DraftAgreement;
-  } catch {
-    return null;
+  for (const key of STORAGE_KEYS) {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) continue;
+
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        return parsed as AgreementRecord;
+      }
+    } catch {
+      // ignore bad session data and keep checking
+    }
   }
+
+  return null;
 }
 
-function shellClass() {
-  return [
-    "relative overflow-hidden rounded-[28px] border border-white/12",
-    "bg-gradient-to-br from-white/[0.075] via-white/[0.045] to-white/[0.022]",
-    "shadow-[0_18px_52px_rgba(0,0,0,0.44),0_0_38px_rgba(16,185,129,0.06)]",
-    "backdrop-blur",
-  ].join(" ");
+function evaluateCleanStatus(isPaid: boolean): boolean {
+  if (typeof window === "undefined") return false;
+
+  if (isPaid) return true;
+
+  const hasUsedFree = localStorage.getItem(FREE_FLAG_KEY) === "true";
+
+  if (!hasUsedFree) {
+    localStorage.setItem(FREE_FLAG_KEY, "true");
+    return true;
+  }
+
+  return false;
 }
 
-function sectionAccent() {
-  return (
-    <div className="mb-4 h-[2px] w-12 rounded-full bg-emerald-400/85 shadow-[0_0_16px_rgba(16,185,129,0.5)]" />
-  );
+function toTitleCase(value: string) {
+  return value
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[_-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatDateTime(value?: string) {
+  if (!value) return "—";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toLocaleString();
+}
+
+function formatValue(value: unknown) {
+  if (value === null || value === undefined || value === "") return "—";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  return String(value);
+}
+
+function extractDisplayFields(record: AgreementRecord): Array<[string, unknown]> {
+  const internalKeys = new Set([
+    "title",
+    "agreementType",
+    "createdAt",
+    "acknowledgedAt",
+    "isPaid",
+    "fields",
+  ]);
+
+  const fieldEntries =
+    record.fields && typeof record.fields === "object"
+      ? Object.entries(record.fields)
+      : [];
+
+  const directEntries = Object.entries(record).filter(([key]) => !internalKeys.has(key));
+
+  const combined = [...fieldEntries, ...directEntries];
+
+  return combined.filter(([, value]) => {
+    return value !== null && value !== undefined && String(value).trim() !== "";
+  });
 }
 
 export default function ReceiptPage() {
-  const router = useRouter();
-  const [draft, setDraft] = useState<DraftAgreement | null>(null);
-  const [checkedStorage, setCheckedStorage] = useState(false);
-  const [isPaid, setIsPaid] = useState(false);
+  const [agreement, setAgreement] = useState<AgreementRecord | null>(null);
+  const [isClean, setIsClean] = useState(false);
+  const [isReady, setIsReady] = useState(false);
+  const [usedFreeThisTime, setUsedFreeThisTime] = useState(false);
 
   useEffect(() => {
-    const d = loadDraft();
-    setDraft(d);
-    setIsPaid(sessionStorage.getItem(PAID_KEY) === "true");
-    setCheckedStorage(true);
+    const record = readAgreementFromSession();
+    setAgreement(record);
+
+    if (record) {
+      const paid = record.isPaid === true;
+      const alreadyUsedFree =
+        typeof window !== "undefined" &&
+        localStorage.getItem(FREE_FLAG_KEY) === "true";
+
+      const clean = evaluateCleanStatus(paid);
+
+      setIsClean(clean);
+      setUsedFreeThisTime(!paid && !alreadyUsedFree && clean);
+    }
+
+    setIsReady(true);
   }, []);
 
-  const createdAtLabel = useMemo(() => {
-    if (!draft) return "";
-    const ts =
-      draft.acknowledgments?.personA?.timestamp ??
-      draft.acknowledgments?.personB?.timestamp ??
-      Date.now();
-    return new Date(ts).toLocaleString();
-  }, [draft]);
+  const displayFields = useMemo(() => {
+    if (!agreement) return [];
+    return extractDisplayFields(agreement);
+  }, [agreement]);
 
-  const hasNotary = !!(draft?.includeNotary && draft?.notary?.certificateText);
+  const agreementTitle =
+    agreement?.title ||
+    agreement?.agreementType ||
+    "Mutual Acknowledgment Record";
 
-  function newAgreement() {
-    sessionStorage.removeItem(STORAGE_KEY);
-    router.push("/new");
-  }
+  const createdAt = formatDateTime(agreement?.createdAt);
+  const acknowledgedAt = formatDateTime(agreement?.acknowledgedAt);
 
-  function shareRecord() {
-    if (typeof window === "undefined") return;
+  async function handleShare() {
+    if (!agreement) return;
+
+    const shareText = `${agreementTitle}\nCreated: ${createdAt}\nAcknowledged: ${acknowledgedAt}`;
 
     if (navigator.share) {
-      navigator
-        .share({
-          title: "TERMS Record",
-          text: "A shared agreement record was created in TERMS.",
-          url: window.location.href,
-        })
-        .catch(() => {});
+      try {
+        await navigator.share({
+          title: agreementTitle,
+          text: shareText,
+        });
+      } catch {
+        // user canceled or share unavailable
+      }
       return;
     }
 
-    navigator.clipboard
-      .writeText(window.location.href)
-      .then(() => alert("Link copied."))
-      .catch(() => {});
+    try {
+      await navigator.clipboard.writeText(shareText);
+      alert("Record details copied to clipboard.");
+    } catch {
+      alert("Unable to share or copy from this device.");
+    }
   }
 
-  if (checkedStorage && !draft) {
+  function handlePrint() {
+    window.print();
+  }
+
+  if (!isReady) {
     return (
-      <main className="relative min-h-screen overflow-hidden px-4 py-8 text-white">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(10,32,49,0.45),transparent_38%),radial-gradient(circle_at_18%_26%,rgba(16,185,129,0.10),transparent_24%),radial-gradient(circle_at_84%_18%,rgba(37,99,235,0.10),transparent_24%),linear-gradient(180deg,rgba(2,5,10,0.96)_0%,rgba(2,7,13,0.98)_50%,rgba(2,5,10,0.98)_100%)]" />
-          <div className="absolute left-1/2 top-0 h-[340px] w-[860px] -translate-x-1/2 rounded-full bg-emerald-400/8 blur-3xl" />
-          <div className="absolute left-[6%] top-[30%] h-[220px] w-[220px] rounded-full bg-cyan-400/6 blur-3xl" />
-          <div className="absolute right-[7%] top-[14%] h-[280px] w-[280px] rounded-full bg-blue-500/8 blur-3xl" />
-        </div>
-
-        <div className="relative mx-auto w-full max-w-3xl space-y-6">
-          <section className={shellClass() + " p-6"}>
-            {sectionAccent()}
-            <div className="text-xl font-semibold text-white">Record not found</div>
-            <div className="mt-2 max-w-2xl text-sm leading-6 text-white/62">
-              Your draft was not found in this tab’s session storage. This can happen
-              if storage was cleared or the page was opened in a new tab or window.
-            </div>
-
-            <div className="mt-6 space-y-3">
-              <button
-                className="inline-flex w-full items-center justify-center rounded-xl bg-emerald-400 px-5 py-3 text-sm font-semibold text-black shadow-[0_0_28px_rgba(16,185,129,0.24),0_12px_28px_rgba(0,0,0,0.24)] transition hover:bg-emerald-300"
-                onClick={() => router.push("/ack")}
-              >
-                Back to Acknowledge
-              </button>
-
-              <button
-                className="inline-flex w-full items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/[0.07]"
-                onClick={() => router.push("/new")}
-              >
-                Back to Create
-              </button>
-            </div>
-          </section>
+      <main className="min-h-screen bg-neutral-100 px-4 py-8 text-neutral-900">
+        <div className="mx-auto max-w-3xl rounded-3xl border border-neutral-200 bg-white p-8 shadow-sm">
+          <p className="text-sm text-neutral-500">Loading receipt...</p>
         </div>
       </main>
     );
   }
 
-  if (!draft) return null;
+  if (!agreement) {
+    return (
+      <main className="min-h-screen bg-neutral-100 px-4 py-8 text-neutral-900">
+        <div className="mx-auto max-w-3xl rounded-3xl border border-neutral-200 bg-white p-8 shadow-sm">
+          <div className="space-y-4 text-center">
+            <h1 className="text-2xl font-semibold">No agreement found</h1>
+            <p className="text-sm text-neutral-600">
+              There is no finalized agreement in session storage to display.
+            </p>
+            <div className="pt-2">
+              <Link
+                href="/new"
+                className="inline-flex items-center justify-center rounded-2xl bg-neutral-900 px-5 py-3 text-sm font-medium text-white transition hover:opacity-90"
+              >
+                Start a new agreement
+              </Link>
+            </div>
+            <div className="pt-6 text-xs text-neutral-500">
+              Not legal advice · Built by ZeroHour Systems
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
-    <main className="relative min-h-screen overflow-hidden px-4 py-8 text-white">
-      <style jsx global>{`
-        .preview-watermark {
-          position: absolute;
-          top: 42%;
-          left: 50%;
-          transform: translate(-50%, -50%) rotate(-18deg);
-          font-size: 2.35rem;
-          font-weight: 800;
-          color: rgba(0, 0, 0, 0.08);
-          pointer-events: none;
-          user-select: none;
-          white-space: nowrap;
-          text-align: center;
-          letter-spacing: 0.03em;
-          z-index: 2;
-        }
+    <main className="min-h-screen bg-neutral-100 px-4 py-8 text-neutral-900 print:bg-white print:px-0 print:py-0">
+      <div className="mx-auto max-w-4xl">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
+          <Link
+            href="/new"
+            className="inline-flex items-center rounded-2xl border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-800 shadow-sm transition hover:bg-neutral-50"
+          >
+            New agreement
+          </Link>
 
-        .preview-watermark .wm-sub {
-          display: block;
-          margin-top: 0.35rem;
-          font-size: 0.98rem;
-          font-weight: 700;
-        }
+          <div className="flex flex-wrap items-center gap-3">
+            {typeof navigator !== "undefined" && (
+              <button
+                type="button"
+                onClick={handleShare}
+                className="inline-flex items-center rounded-2xl border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-800 shadow-sm transition hover:bg-neutral-50"
+              >
+                Share
+              </button>
+            )}
 
-        .preview-watermark .wm-small {
-          display: block;
-          margin-top: 0.2rem;
-          font-size: 0.86rem;
-          font-weight: 600;
-        }
-      `}</style>
-
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(10,32,49,0.45),transparent_38%),radial-gradient(circle_at_18%_26%,rgba(16,185,129,0.10),transparent_24%),radial-gradient(circle_at_84%_18%,rgba(37,99,235,0.10),transparent_24%),linear-gradient(180deg,rgba(2,5,10,0.96)_0%,rgba(2,7,13,0.98)_50%,rgba(2,5,10,0.98)_100%)]" />
-        <div className="absolute left-1/2 top-0 h-[340px] w-[860px] -translate-x-1/2 rounded-full bg-emerald-400/8 blur-3xl" />
-        <div className="absolute left-[6%] top-[30%] h-[220px] w-[220px] rounded-full bg-cyan-400/6 blur-3xl" />
-        <div className="absolute right-[7%] top-[14%] h-[280px] w-[280px] rounded-full bg-blue-500/8 blur-3xl" />
-        <div className="absolute bottom-[8%] left-1/2 h-[240px] w-[760px] -translate-x-1/2 rounded-full bg-emerald-500/5 blur-3xl" />
-      </div>
-
-      <div className="relative mx-auto w-full max-w-3xl space-y-6">
-        <section className={shellClass() + " p-7 md:p-8"}>
-          <div className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-emerald-400/55 to-transparent" />
-          <div className="absolute left-1/2 top-0 h-16 w-72 -translate-x-1/2 bg-emerald-400/10 blur-3xl" />
-          <div className="absolute inset-y-0 right-0 w-[34%] bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.10),transparent_48%),radial-gradient(circle_at_60%_40%,rgba(59,130,246,0.08),transparent_42%)]" />
-
-          <div className="relative flex items-start justify-between gap-4">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/50">
-                {APP_META.product} · Record
-              </div>
-
-              <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white">
-                Record <span className="text-emerald-300">Finalized</span>
-              </h1>
-
-              <p className="mt-3 max-w-2xl text-base leading-7 text-white/72">
-                This is the completed shared record of what was agreed and
-                acknowledged.
-              </p>
-            </div>
-
-            <div className="hidden rounded-2xl border border-emerald-400/20 bg-gradient-to-br from-emerald-400/14 to-emerald-500/7 px-3 py-2 text-xs font-semibold text-emerald-300 shadow-[0_0_24px_rgba(16,185,129,0.12)] md:block">
-              {APP_META.company}
-            </div>
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="inline-flex items-center rounded-2xl bg-neutral-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:opacity-90"
+            >
+              Print / Save PDF
+            </button>
           </div>
+        </div>
 
-          <div className="relative mt-7">
-            <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.08em] text-white/45">
-              <span>Create</span>
-              <span>Review</span>
-              <span>Acknowledge</span>
-              <span className="text-white/90">Record</span>
-            </div>
-
-            <div className="mt-3 h-[4px] rounded-full bg-white/8">
-              <div className="h-[4px] w-full rounded-full bg-emerald-400 shadow-[0_0_16px_rgba(16,185,129,0.45)]" />
-            </div>
+        {usedFreeThisTime && (
+          <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 print:hidden">
+            Your first finalized agreement is free.
           </div>
-        </section>
+        )}
 
-        <section className={shellClass() + " p-4 sm:p-6"}>
-          <div className="absolute inset-y-0 left-0 w-[26%] bg-[radial-gradient(circle_at_left_center,rgba(16,185,129,0.07),transparent_62%)]" />
+        {!isClean && (
+          <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 print:hidden">
+            Lock this agreement as a clean, shareable record. Finalize – $1.99
+          </div>
+        )}
 
-          <div className="relative">
-            {sectionAccent()}
-
-            <div className="rounded-[28px] bg-white text-black shadow-[0_18px_48px_rgba(0,0,0,0.22)]">
-              <div className="relative overflow-hidden rounded-[28px] px-6 py-8 sm:px-8 sm:py-10">
-                {!isPaid && (
-                  <div className="preview-watermark">
-                    DRAFT – UNFINALIZED AGREEMENT
-                    <span className="wm-sub">Generated via TERMS (Preview Mode)</span>
-                    <span className="wm-small">Finalization requires unlock.</span>
-                  </div>
-                )}
-
-                <div className="relative z-[1]">
-                  <div className="text-center">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.28em] text-black/45">
-                      {APP_META.product}
-                    </div>
-                    <h2 className="mt-3 text-2xl font-semibold tracking-tight text-black sm:text-3xl">
-                      {draft.title?.trim() || "Untitled Agreement"}
-                    </h2>
-                    <div className="mt-3 text-sm leading-6 text-black/60">
-                      Record of mutual acknowledgment
-                    </div>
-                  </div>
-
-                  <div className="mt-8 border-t border-black/10 pt-5">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-black/45">
-                      Parties
-                    </div>
-
-                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-2xl border border-black/8 bg-black/[0.02] px-4 py-3">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-black/40">
-                          Person A
-                        </div>
-                        <div className="mt-1 text-sm font-medium leading-6 text-black">
-                          {draft.acknowledgments?.personA?.typedName || draft.personA || "Person A"}
-                        </div>
-                      </div>
-
-                      <div className="rounded-2xl border border-black/8 bg-black/[0.02] px-4 py-3">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-black/40">
-                          Person B
-                        </div>
-                        <div className="mt-1 text-sm font-medium leading-6 text-black">
-                          {draft.acknowledgments?.personB?.typedName || draft.personB || "Person B"}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-8 border-t border-black/10 pt-5">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-black/45">
-                      Agreement
-                    </div>
-
-                    <div className="mt-4 whitespace-pre-wrap text-[15px] leading-8 text-black/88">
-                      {draft.agreementText?.trim() || ""}
-                    </div>
-                  </div>
-
-                  <div className="mt-8 border-t border-black/10 pt-5">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-black/45">
-                      Acknowledgment Record
-                    </div>
-
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-2xl border border-black/8 bg-black/[0.02] px-4 py-3 text-sm leading-6 text-black/80">
-                        <div>
-                          <span className="font-semibold text-black/72">Created:</span>{" "}
-                          {createdAtLabel}
-                        </div>
-                        <div className="mt-1">
-                          <span className="font-semibold text-black/72">Status:</span>{" "}
-                          {isPaid ? "Finalized" : "Preview / Draft"}
-                        </div>
-                      </div>
-
-                      <div className="rounded-2xl border border-black/8 bg-black/[0.02] px-4 py-3 text-sm leading-6 text-black/80">
-                        <div>
-                          <span className="font-semibold text-black/72">Acknowledged by:</span>
-                        </div>
-                        <div className="mt-1">
-                          {draft.acknowledgments?.personA?.typedName || draft.personA}
-                        </div>
-                        <div>
-                          {draft.acknowledgments?.personB?.typedName || draft.personB}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-8 border-t border-black/10 pt-5">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-black/45">
-                      Signature Lines
-                    </div>
-
-                    <div className="mt-4 grid gap-5 sm:grid-cols-2">
-                      <div className="space-y-5">
-                        <div>
-                          <div className="border-b border-black/20 pb-2 text-sm text-black/75">
-                            {draft.personA || "Person A"}
-                          </div>
-                          <div className="mt-2 text-xs uppercase tracking-[0.14em] text-black/40">
-                            Person A Signature
-                          </div>
-                        </div>
-
-                        <div>
-                          <div className="border-b border-black/20 pb-2 text-sm text-black/75">
-                            {draft.personB || "Person B"}
-                          </div>
-                          <div className="mt-2 text-xs uppercase tracking-[0.14em] text-black/40">
-                            Person B Signature
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-5">
-                        <div>
-                          <div className="border-b border-black/20 pb-2 text-sm text-black/75">
-                            {createdAtLabel}
-                          </div>
-                          <div className="mt-2 text-xs uppercase tracking-[0.14em] text-black/40">
-                            Date
-                          </div>
-                        </div>
-
-                        <div>
-                          <div className="border-b border-black/20 pb-2 text-sm text-black/75">
-                            {createdAtLabel}
-                          </div>
-                          <div className="mt-2 text-xs uppercase tracking-[0.14em] text-black/40">
-                            Date
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {hasNotary ? (
-                    <div className="mt-8 border-t border-black/10 pt-5">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-black/45">
-                        Notary Certificate
-                      </div>
-
-                      <div className="mt-3 text-xs leading-6 text-black/55">
-                        This certificate may be completed, modified, or replaced by the
-                        notary as required by applicable law.
-                      </div>
-
-                      {(draft.notary?.mode || draft.notary?.state || draft.notary?.parish) && (
-                        <div className="mt-4 rounded-2xl border border-black/8 bg-black/[0.02] px-4 py-3 text-sm leading-6 text-black/78">
-                          {draft.notary?.mode ? (
-                            <div>
-                              <span className="font-semibold text-black/72">Mode:</span>{" "}
-                              {draft.notary.mode}
-                            </div>
-                          ) : null}
-
-                          {draft.notary?.state || draft.notary?.parish ? (
-                            <div>
-                              <span className="font-semibold text-black/72">Venue:</span>{" "}
-                              {draft.notary?.state || ""}
-                              {draft.notary?.parish
-                                ? ` — County/Parish of ${draft.notary.parish}`
-                                : ""}
-                            </div>
-                          ) : null}
-                        </div>
-                      )}
-
-                      <div className="mt-4 whitespace-pre-wrap rounded-2xl border border-black/8 bg-black/[0.015] px-4 py-4 text-[15px] leading-8 text-black/82">
-                        {draft.notary?.certificateText}
-                      </div>
-                    </div>
-                  ) : null}
-
-                  <div className="mt-8 border-t border-black/10 pt-5 text-xs leading-6 text-black/50">
-                    Generated via {APP_META.product}. A {APP_META.company} product.
-                    Not legal advice.
-                  </div>
+        <section className="relative overflow-hidden rounded-[28px] border border-neutral-200 bg-white shadow-sm print:rounded-none print:border-0 print:shadow-none">
+          {!isClean && (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden">
+              <div className="select-none text-center text-[2rem] font-extrabold uppercase tracking-[0.22em] text-neutral-300/70 sm:text-[3rem]">
+                <div className="-rotate-24 whitespace-pre-line">
+                  DRAFT – UNFINALIZED AGREEMENT
+                  {"\n"}
+                  Generated via Terms App (Preview Mode)
                 </div>
               </div>
             </div>
-          </div>
-        </section>
+          )}
 
-        <section className={shellClass() + " p-6"}>
-          <div className="absolute inset-y-0 right-0 w-[30%] bg-[radial-gradient(circle_at_right_center,rgba(16,185,129,0.08),transparent_60%)]" />
+          <div className="relative z-10 p-6 sm:p-10">
+            <header className="border-b border-neutral-200 pb-6">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">
+                    Terms
+                  </p>
+                  <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+                    {agreementTitle}
+                  </h1>
+                  <p className="mt-2 text-sm text-neutral-600">
+                    Mutual acknowledgment record
+                  </p>
+                </div>
 
-          <div className="relative">
-            {sectionAccent()}
-            <div className="flex flex-col gap-3">
-              <button
-                className="inline-flex items-center justify-center rounded-xl bg-emerald-400 px-5 py-3 text-sm font-semibold text-black shadow-[0_0_28px_rgba(16,185,129,0.24),0_12px_28px_rgba(0,0,0,0.24)] transition hover:bg-emerald-300"
-                onClick={shareRecord}
-              >
-                Send to Other Person
-              </button>
+                <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="text-neutral-500">Status:</span>
+                    <span className="font-semibold text-neutral-900">
+                      {isClean ? "Finalized" : "Draft / Unfinalized"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </header>
 
-              <button
-                className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/[0.07]"
-                onClick={() => alert("Add photos for protection (coming next)")}
-              >
-                Add Photos for Protection
-              </button>
+            <div className="grid gap-4 border-b border-neutral-200 py-6 sm:grid-cols-2">
+              <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
+                  Created
+                </div>
+                <div className="mt-2 text-sm font-medium text-neutral-900">
+                  {createdAt}
+                </div>
+              </div>
 
-              {!isPaid ? (
-                <button
-                  className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/[0.07]"
-                  onClick={() => alert("Unlock Final – $1.99 (coming next)")}
-                >
-                  Unlock Final – $1.99
-                </button>
-              ) : null}
-
-              <button
-                className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/[0.07]"
-                onClick={newAgreement}
-              >
-                New Agreement
-              </button>
+              <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
+                  Acknowledged
+                </div>
+                <div className="mt-2 text-sm font-medium text-neutral-900">
+                  {acknowledgedAt}
+                </div>
+              </div>
             </div>
+
+            <section className="py-6">
+              <h2 className="text-lg font-semibold">Agreement details</h2>
+
+              <div className="mt-4 overflow-hidden rounded-3xl border border-neutral-200">
+                {displayFields.length > 0 ? (
+                  <div className="divide-y divide-neutral-200">
+                    {displayFields.map(([key, value]) => (
+                      <div
+                        key={key}
+                        className="grid gap-2 px-4 py-4 sm:grid-cols-[220px_1fr] sm:gap-4"
+                      >
+                        <div className="text-sm font-medium text-neutral-500">
+                          {toTitleCase(key)}
+                        </div>
+                        <div className="text-sm text-neutral-900">
+                          {formatValue(value)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="px-4 py-6 text-sm text-neutral-500">
+                    No agreement fields were found for this record.
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section className="border-t border-neutral-200 py-6">
+              <h2 className="text-lg font-semibold">Acknowledgment</h2>
+              <p className="mt-3 text-sm leading-6 text-neutral-700">
+                This record reflects the information entered and acknowledged by
+                the parties at the time shown above. TERMS provides a plain-language
+                mutual acknowledgment record only.
+              </p>
+            </section>
+
+            <footer className="border-t border-neutral-200 pt-6">
+              <div className="flex flex-col gap-2 text-xs text-neutral-500 sm:flex-row sm:items-center sm:justify-between">
+                <span>Not legal advice · Built by ZeroHour Systems</span>
+                <span>{isClean ? "Clean record" : "Draft preview"}</span>
+              </div>
+            </footer>
           </div>
         </section>
-
-        <footer className="text-center text-sm leading-6 text-white/42">
-          A clean record of what both people agreed to.
-        </footer>
       </div>
     </main>
   );
