@@ -41,6 +41,7 @@ export default function HomePage() {
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#03060b] text-white">
+      {/* Background */}
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(10,32,49,0.55),transparent_40%),radial-gradient(circle_at_20%_30%,rgba(16,185,129,0.12),transparent_28%),radial-gradient(circle_at_82%_18%,rgba(37,99,235,0.14),transparent_26%),linear-gradient(180deg,#02050a_0%,#030812_45%,#02050a_100%)]" />
         <div className="absolute left-1/2 top-0 h-[340px] w-[900px] -translate-x-1/2 rounded-full bg-emerald-400/10 blur-3xl" />
@@ -50,6 +51,8 @@ export default function HomePage() {
       </div>
 
       <div className="relative mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 md:px-6 md:py-10">
+
+        {/* HERO */}
         <section className={shellClass() + " p-7 md:p-9"}>
           <div className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-emerald-400/60 to-transparent" />
           <div className="absolute left-1/2 top-0 h-20 w-80 -translate-x-1/2 bg-emerald-400/12 blur-3xl" />
@@ -102,6 +105,7 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* WHAT IT DOES */}
         <section className={panelClass() + " p-6 md:p-7"}>
           <div className="absolute inset-y-0 left-0 w-[34%] bg-[radial-gradient(circle_at_left_center,rgba(16,185,129,0.08),transparent_62%)]" />
 
@@ -122,9 +126,9 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* START */}
         <section className={panelClass() + " p-6 md:p-7"}>
           <div className="absolute inset-y-0 right-0 w-[32%] bg-[radial-gradient(circle_at_right_center,rgba(59,130,246,0.09),transparent_60%)]" />
-          <div className="absolute inset-x-14 top-0 h-px bg-gradient-to-r from-transparent via-white/18 to-transparent" />
 
           <div className="relative">
             <h3 className="text-2xl font-semibold tracking-tight text-white">
@@ -138,12 +142,7 @@ export default function HomePage() {
             <div className="mt-7 space-y-4">
               <Link
                 href={hasDraft ? "/review" : "/new"}
-                className={[
-                  "inline-flex w-full items-center justify-center rounded-2xl px-5 py-4 text-base font-semibold transition",
-                  "bg-emerald-400 text-black",
-                  "shadow-[0_0_34px_rgba(16,185,129,0.26),0_12px_30px_rgba(0,0,0,0.28)]",
-                  "hover:bg-emerald-300",
-                ].join(" ")}
+                className="inline-flex w-full items-center justify-center rounded-2xl px-5 py-4 text-base font-semibold bg-emerald-400 text-black shadow-[0_0_34px_rgba(16,185,129,0.26),0_12px_30px_rgba(0,0,0,0.28)] hover:bg-emerald-300 transition"
               >
                 {hasDraft ? "Continue Agreement" : "Create Agreement"}
               </Link>
@@ -160,9 +159,21 @@ export default function HomePage() {
           </div>
         </section>
 
-        <footer className="pb-2 text-center text-sm leading-6 text-white/42">
-          Not legal advice. A ZeroHour Systems product.
+        {/* FOOTER (FIXED) */}
+        <footer className="mt-10 pt-6 border-t border-white/10 text-center text-sm text-white/40 space-y-2">
+          <div>
+            <a href="/terms" className="mx-2 hover:text-white transition">Terms</a>
+            <span className="text-white/20">|</span>
+            <a href="/privacy" className="mx-2 hover:text-white transition">Privacy</a>
+            <span className="text-white/20">|</span>
+            <a href="/disclaimer" className="mx-2 hover:text-white transition">Disclaimer</a>
+          </div>
+
+          <div className="text-white/30">
+            Not legal advice. A ZeroHour Systems product.
+          </div>
         </footer>
+
       </div>
     </main>
   );
