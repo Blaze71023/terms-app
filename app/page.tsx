@@ -1,102 +1,167 @@
-// app/page.tsx
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-
-type DraftAgreement = {
-  title: string;
-  personA: string;
-  personB: string;
-  agreementText: string;
-  includeNotary?: boolean;
-};
 
 const STORAGE_KEY = "draftAgreement";
 
-function hasDraft(): boolean {
-  try {
-    return !!sessionStorage.getItem(STORAGE_KEY);
-  } catch {
-    return false;
-  }
+function shellClass() {
+  return [
+    "relative overflow-hidden rounded-[30px] border border-white/12",
+    "bg-gradient-to-br from-white/[0.075] via-white/[0.04] to-white/[0.02]",
+    "shadow-[0_18px_60px_rgba(0,0,0,0.45),0_0_50px_rgba(16,185,129,0.07)]",
+    "backdrop-blur",
+  ].join(" ");
+}
+
+function panelClass() {
+  return [
+    "relative overflow-hidden rounded-[28px] border border-white/12",
+    "bg-gradient-to-br from-white/[0.07] via-white/[0.04] to-white/[0.022]",
+    "shadow-[0_12px_36px_rgba(0,0,0,0.34)]",
+    "backdrop-blur",
+  ].join(" ");
+}
+
+function accentLineClass() {
+  return "h-[3px] w-16 rounded-full bg-emerald-400 shadow-[0_0_18px_rgba(16,185,129,0.55)]";
 }
 
 export default function HomePage() {
-  const router = useRouter();
-  const [resumeAvailable, setResumeAvailable] = useState(false);
+  const [hasDraft, setHasDraft] = useState(false);
 
   useEffect(() => {
-    setResumeAvailable(hasDraft());
+    try {
+      const raw = sessionStorage.getItem(STORAGE_KEY);
+      setHasDraft(!!raw);
+    } catch {
+      setHasDraft(false);
+    }
   }, []);
 
-  function clearDraft() {
-    sessionStorage.removeItem(STORAGE_KEY);
-    setResumeAvailable(false);
-  }
-
   return (
-    <main className="min-h-screen px-4 py-8 text-white">
-      <div className="mx-auto w-full max-w-2xl space-y-6">
-        {/* Hero */}
-        <div className="overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-r from-indigo-600 via-fuchsia-600 to-purple-600 p-7 shadow-[0_30px_90px_rgba(0,0,0,0.65)]">
-          <div className="text-white/85 text-sm font-semibold">Mutual Acknowledgment</div>
-          <div className="mt-2 text-4xl font-semibold tracking-tight text-white">Terms App</div>
-          <div className="mt-3 text-white/90 text-lg">
-            Create an agreement, review it together, sign, and print a receipt.
+    <main className="relative min-h-screen overflow-hidden bg-[#03060b] text-white">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(10,32,49,0.55),transparent_40%),radial-gradient(circle_at_20%_30%,rgba(16,185,129,0.12),transparent_28%),radial-gradient(circle_at_82%_18%,rgba(37,99,235,0.14),transparent_26%),linear-gradient(180deg,#02050a_0%,#030812_45%,#02050a_100%)]" />
+        <div className="absolute left-1/2 top-0 h-[340px] w-[900px] -translate-x-1/2 rounded-full bg-emerald-400/10 blur-3xl" />
+        <div className="absolute left-[8%] top-[28%] h-[260px] w-[260px] rounded-full bg-cyan-400/7 blur-3xl" />
+        <div className="absolute right-[6%] top-[16%] h-[320px] w-[320px] rounded-full bg-blue-500/10 blur-3xl" />
+        <div className="absolute bottom-[10%] left-1/2 h-[240px] w-[780px] -translate-x-1/2 rounded-full bg-emerald-500/6 blur-3xl" />
+      </div>
+
+      <div className="relative mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 md:px-6 md:py-10">
+        <section className={shellClass() + " p-7 md:p-9"}>
+          <div className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-emerald-400/60 to-transparent" />
+          <div className="absolute left-1/2 top-0 h-20 w-80 -translate-x-1/2 bg-emerald-400/12 blur-3xl" />
+          <div className="absolute inset-y-0 right-0 w-[38%] bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.10),transparent_48%),radial-gradient(circle_at_60%_40%,rgba(59,130,246,0.08),transparent_42%)]" />
+
+          <div className="relative flex items-start justify-between gap-5">
+            <div className="max-w-3xl">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/50">
+                ZeroHour Systems
+              </div>
+
+              <h1 className="mt-4 text-5xl font-semibold tracking-tight text-white md:text-6xl">
+                TERMS
+              </h1>
+
+              <div className="mt-5">
+                <div className={accentLineClass()} />
+              </div>
+
+              <h2 className="mt-7 max-w-2xl text-3xl font-semibold tracking-tight text-white md:text-[2.4rem] md:leading-[1.1]">
+                Lock in what was <span className="text-emerald-300">agreed</span>.
+              </h2>
+
+              <p className="mt-5 max-w-2xl text-lg leading-8 text-white/72">
+                Create a simple shared record in seconds, so nobody can later say,
+                “that’s not what we said.”
+              </p>
+            </div>
+
+            <div className="hidden shrink-0 md:block">
+              <div className="rounded-2xl border border-emerald-400/25 bg-gradient-to-br from-emerald-400/14 to-emerald-500/7 px-5 py-4 text-sm font-semibold text-emerald-200 shadow-[0_0_28px_rgba(16,185,129,0.14)]">
+                Ready
+                <br />
+                fast
+              </div>
+            </div>
           </div>
 
-          <div className="mt-6">
-            <div className="flex items-center justify-between text-white/70 text-sm font-semibold">
-              <span className="text-white font-semibold">Create</span>
+          <div className="relative mt-10">
+            <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.14em] text-white/42">
+              <span className="text-white/94">Create</span>
               <span>Review</span>
-              <span>Sign</span>
-              <span>Receipt</span>
+              <span>Acknowledge</span>
+              <span>Record</span>
             </div>
-            <div className="mt-3 h-2 rounded-full bg-white/20">
-              <div className="h-2 w-[10%] rounded-full bg-white/85" />
+
+            <div className="mt-4 h-[5px] rounded-full bg-white/8">
+              <div className="h-[5px] w-[22%] rounded-full bg-emerald-400 shadow-[0_0_18px_rgba(16,185,129,0.45)]" />
             </div>
-          </div>
-        </div>
-
-        {/* Body */}
-        <section className="ui-surface p-6">
-          <div className="ui-paper p-6">
-            <div className="text-base font-semibold text-slate-900">What this does</div>
-            <p className="mt-2 ui-help leading-6">
-              This app records a shared understanding in plain language. It is not legal advice.
-            </p>
-            <p className="mt-3 ui-help leading-6">
-              If notarization is required, the notary must witness the signing and complete the
-              certificate per the law where notarization occurs.
-            </p>
-          </div>
-
-          <div className="mt-5 flex flex-col gap-3">
-            {resumeAvailable ? (
-              <>
-                <button className="ui-btn-ghost" onClick={() => router.push("/new")}>
-                  Resume Draft
-                </button>
-                <button className="ui-btn-ghost" onClick={clearDraft}>
-                  Clear Saved Draft
-                </button>
-              </>
-            ) : null}
-
-            <button className="ui-btn-primary" onClick={() => router.push("/new")}>
-              Create Agreement
-            </button>
-          </div>
-
-          <div className="mt-5 text-white/65 text-sm leading-6">
-            Tip: keep it short, clear, and true.
           </div>
         </section>
 
-        <footer className="text-white/55 text-sm leading-6">
-          Not legal advice. If notarization is required, the notary must witness and complete the
-          certificate per the law where notarization occurs.
+        <section className={panelClass() + " p-6 md:p-7"}>
+          <div className="absolute inset-y-0 left-0 w-[34%] bg-[radial-gradient(circle_at_left_center,rgba(16,185,129,0.08),transparent_62%)]" />
+
+          <div className="relative">
+            <h3 className="text-2xl font-semibold tracking-tight text-white">
+              What this does
+            </h3>
+
+            <p className="mt-5 max-w-3xl text-lg leading-8 text-white/72">
+              TERMS creates a simple, time-stamped record of what two people agreed
+              to in plain language.
+            </p>
+
+            <p className="mt-4 max-w-3xl text-lg leading-8 text-white/66">
+              It is not legal advice. It is clarity, acknowledgment, and a clean
+              record you can come back to later.
+            </p>
+          </div>
+        </section>
+
+        <section className={panelClass() + " p-6 md:p-7"}>
+          <div className="absolute inset-y-0 right-0 w-[32%] bg-[radial-gradient(circle_at_right_center,rgba(59,130,246,0.09),transparent_60%)]" />
+          <div className="absolute inset-x-14 top-0 h-px bg-gradient-to-r from-transparent via-white/18 to-transparent" />
+
+          <div className="relative">
+            <h3 className="text-2xl font-semibold tracking-tight text-white">
+              Start here
+            </h3>
+
+            <p className="mt-4 text-lg leading-8 text-white/68">
+              Create a new agreement now, or continue where you left off.
+            </p>
+
+            <div className="mt-7 space-y-4">
+              <Link
+                href={hasDraft ? "/review" : "/new"}
+                className={[
+                  "inline-flex w-full items-center justify-center rounded-2xl px-5 py-4 text-base font-semibold transition",
+                  "bg-emerald-400 text-black",
+                  "shadow-[0_0_34px_rgba(16,185,129,0.26),0_12px_30px_rgba(0,0,0,0.28)]",
+                  "hover:bg-emerald-300",
+                ].join(" ")}
+              >
+                {hasDraft ? "Continue Agreement" : "Create Agreement"}
+              </Link>
+
+              <div className="rounded-2xl border border-white/10 bg-gradient-to-r from-white/[0.05] to-white/[0.025] px-5 py-4 text-base text-white/62">
+                Most agreements should take less than 30 seconds.
+              </div>
+            </div>
+
+            <p className="mt-5 text-base leading-7 text-white/54">
+              After creation, you can review it together, confirm it, and save a
+              clean record.
+            </p>
+          </div>
+        </section>
+
+        <footer className="pb-2 text-center text-sm leading-6 text-white/42">
+          Not legal advice. A ZeroHour Systems product.
         </footer>
       </div>
     </main>
