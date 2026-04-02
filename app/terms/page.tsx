@@ -19,23 +19,34 @@ export default function TermsPage() {
         created using this app.
       </p>
 
-      <p>
+      {/* 🔒 Refund Policy (Added) */}
+      <p className="mb-4">
+        Due to the digital nature of this product, all purchases are final. If you
+        experience an issue, contact support and we will work to resolve it.
+      </p>
+
+      <p className="mb-4">
         Use of this app is at your own discretion and risk. ZeroHour Systems
         reserves the right to update or modify the service at any time.
       </p>
+
       <div className="mt-12 pt-6 border-t border-white/10 text-center text-sm text-white/40">
-  <a href="/terms" className="mx-2 hover:text-white transition">
-    Terms
-  </a>
-  <span className="text-white/20">|</span>
-  <a href="/privacy" className="mx-2 hover:text-white transition">
-    Privacy
-  </a>
-  <span className="text-white/20">|</span>
-  <a href="/disclaimer" className="mx-2 hover:text-white transition">
-    Disclaimer
-  </a>
-</div>
+        <a href="/terms" className="mx-2 hover:text-white transition">
+          Terms
+        </a>
+
+        <span className="text-white/20">|</span>
+
+        <a href="/privacy" className="mx-2 hover:text-white transition">
+          Privacy
+        </a>
+
+        <span className="text-white/20">|</span>
+
+        <a href="/disclaimer" className="mx-2 hover:text-white transition">
+          Disclaimer
+        </a>
+      </div>
     </main>
   );
 }
