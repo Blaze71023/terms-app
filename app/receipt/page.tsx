@@ -104,13 +104,19 @@ export default function ReceiptPage() {
   const [isClean, setIsClean] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [usedFreeThisTime, setUsedFreeThisTime] = useState(false);
+  const [isStartingCheckout, setIsStartingCheckout] = useState(false);
 
   useEffect(() => {
     const record = readAgreementFromSession();
     setAgreement(record);
 
     if (record) {
-      const paid = record.isPaid === true;
+      const sessionPaid =
+        typeof window !== "undefined" &&
+        sessionStorage.getItem("isPaid") === "true";
+
+      const paid = record.isPaid === true || sessionPaid;
+
       const alreadyUsedFree =
         typeof window !== "undefined" &&
         localStorage.getItem(FREE_FLAG_KEY) === "true";
@@ -164,6 +170,30 @@ export default function ReceiptPage() {
 
   function handlePrint() {
     window.print();
+  }
+
+  async function handleCheckout() {
+    try {
+      setIsStartingCheckout(true);
+
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+      });
+
+      const data = await res.json();
+
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+
+      alert("Failed to start checkout.");
+    } catch (err) {
+      console.error("Checkout start failed:", err);
+      alert("Something went wrong starting checkout.");
+    } finally {
+      setIsStartingCheckout(false);
+    }
   }
 
   if (!isReady) {
@@ -241,8 +271,17 @@ export default function ReceiptPage() {
         )}
 
         {!isClean && (
-          <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm print:hidden">
-            Lock this agreement as a clean, shareable record. Finalize – $1.99
+          <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800 shadow-sm print:hidden">
+            <div>Lock this agreement as a clean, shareable record.</div>
+
+            <button
+              type="button"
+              onClick={handleCheckout}
+              disabled={isStartingCheckout}
+              className="inline-flex items-center justify-center rounded-xl bg-amber-500 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {isStartingCheckout ? "Starting checkout..." : "Finalize – $1.99"}
+            </button>
           </div>
         )}
 
