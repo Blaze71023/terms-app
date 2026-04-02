@@ -29,7 +29,7 @@ function readAgreementFromSession(): AgreementRecord | null {
         return parsed as AgreementRecord;
       }
     } catch {
-      // ignore bad session data and keep checking
+      // Ignore bad session data and continue checking the next key.
     }
   }
 
@@ -90,7 +90,9 @@ function extractDisplayFields(record: AgreementRecord): Array<[string, unknown]>
       ? Object.entries(record.fields)
       : [];
 
-  const directEntries = Object.entries(record).filter(([key]) => !internalKeys.has(key));
+  const directEntries = Object.entries(record).filter(
+    ([key]) => !internalKeys.has(key)
+  );
 
   const combined = [...fieldEntries, ...directEntries];
 
@@ -155,7 +157,7 @@ export default function ReceiptPage() {
           text: shareText,
         });
       } catch {
-        // user canceled or share unavailable
+        // User cancelled or share unavailable.
       }
       return;
     }
@@ -173,24 +175,51 @@ export default function ReceiptPage() {
   }
 
   async function handleCheckout() {
+    if (isStartingCheckout) return;
+
     try {
       setIsStartingCheckout(true);
 
+      console.log("[TERMS] Finalize button clicked");
+
       const res = await fetch("/api/checkout", {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
       });
 
-      const data = await res.json();
+      console.log("[TERMS] /api/checkout status:", res.status);
 
-      if (data.url) {
-        window.location.href = data.url;
-        return;
+      let data: { url?: string; error?: string } = {};
+
+      try {
+        data = await res.json();
+      } catch (jsonError) {
+        console.error("[TERMS] Failed to parse checkout response JSON:", jsonError);
+        throw new Error("Checkout route returned invalid JSON.");
       }
 
-      alert("Failed to start checkout.");
+      console.log("[TERMS] /api/checkout response:", data);
+
+      if (!res.ok) {
+        throw new Error(data?.error || `Checkout request failed with status ${res.status}`);
+      }
+
+      if (!data?.url || typeof data.url !== "string") {
+        throw new Error("No checkout URL returned from /api/checkout.");
+      }
+
+      window.location.href = data.url;
     } catch (err) {
-      console.error("Checkout start failed:", err);
-      alert("Something went wrong starting checkout.");
+      console.error("[TERMS] Checkout start failed:", err);
+
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Something went wrong starting checkout.";
+
+      alert(message);
     } finally {
       setIsStartingCheckout(false);
     }
@@ -349,7 +378,9 @@ export default function ReceiptPage() {
             </div>
 
             <section className="py-6">
-              <h2 className="text-lg font-semibold text-neutral-950">Agreement details</h2>
+              <h2 className="text-lg font-semibold text-neutral-950">
+                Agreement details
+              </h2>
 
               <div className="mt-4 overflow-hidden rounded-3xl border border-neutral-200">
                 {displayFields.length > 0 ? (
@@ -377,7 +408,9 @@ export default function ReceiptPage() {
             </section>
 
             <section className="border-t border-neutral-200 py-6">
-              <h2 className="text-lg font-semibold text-neutral-950">Acknowledgment</h2>
+              <h2 className="text-lg font-semibold text-neutral-950">
+                Acknowledgment
+              </h2>
               <p className="mt-3 text-sm leading-6 text-neutral-700">
                 This record reflects the information entered and acknowledged by
                 the parties at the time shown above. TERMS provides a plain-language
