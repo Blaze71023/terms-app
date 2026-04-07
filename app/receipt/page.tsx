@@ -9,7 +9,7 @@ type AgreementRecord = {
   createdAt?: string;
   acknowledgedAt?: string;
   isPaid?: boolean;
-  fields?: Record<string, string>;
+  fields?: Record<string, unknown>;
   [key: string]: unknown;
 };
 
@@ -69,36 +69,80 @@ function formatDateTime(value?: string) {
   return date.toLocaleString();
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function formatValue(value: unknown) {
   if (value === null || value === undefined || value === "") return "—";
   if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "number") return String(value);
+  if (typeof value === "string") return value;
+
+  if (Array.isArray(value)) {
+    const flattened = value
+      .map((item) => {
+        if (item === null || item === undefined) return "";
+        if (typeof item === "string" || typeof item === "number") return String(item);
+        if (typeof item === "boolean") return item ? "Yes" : "No";
+        return "";
+      })
+      .filter(Boolean)
+      .join(", ");
+
+    return flattened || "—";
+  }
+
+  if (isPlainObject(value)) {
+    return "—";
+  }
+
   return String(value);
 }
 
-function extractDisplayFields(record: AgreementRecord): Array<[string, unknown]> {
-  const internalKeys = new Set([
+function shouldHideField(key: string, value: unknown) {
+  const normalizedKey = key.trim().toLowerCase();
+
+  const hiddenKeys = new Set([
     "title",
-    "agreementType",
-    "createdAt",
-    "acknowledgedAt",
-    "isPaid",
+    "agreementtype",
+    "createdat",
+    "acknowledgedat",
+    "ispaid",
     "fields",
+    "presettype",
+    "presetfields",
+    "manualedit",
+    "includenotary",
+    "acknowledgments",
+    "acknowledgements",
+    "status",
   ]);
 
+  if (hiddenKeys.has(normalizedKey)) return true;
+
+  if (value === null || value === undefined) return true;
+
+  if (typeof value === "string" && value.trim() === "") return true;
+
+  if (isPlainObject(value)) return true;
+
+  return false;
+}
+
+function extractDisplayFields(record: AgreementRecord): Array<[string, unknown]> {
   const fieldEntries =
     record.fields && typeof record.fields === "object"
       ? Object.entries(record.fields)
       : [];
 
-  const directEntries = Object.entries(record).filter(
-    ([key]) => !internalKeys.has(key)
-  );
+  const directEntries = Object.entries(record).filter(([key, value]) => {
+    return !shouldHideField(key, value);
+  });
 
   const combined = [...fieldEntries, ...directEntries];
 
-  return combined.filter(([, value]) => {
-    return value !== null && value !== undefined && String(value).trim() !== "";
-  });
+  return combined.filter(([key, value]) => !shouldHideField(key, value));
 }
 
 export default function ReceiptPage() {
@@ -393,7 +437,7 @@ export default function ReceiptPage() {
                         <div className="text-sm font-medium text-neutral-500">
                           {toTitleCase(key)}
                         </div>
-                        <div className="text-sm text-neutral-900">
+                        <div className="text-sm text-neutral-900 whitespace-pre-wrap break-words">
                           {formatValue(value)}
                         </div>
                       </div>
